@@ -1,38 +1,23 @@
 import { useState, type FC } from 'react'
 
 import FullTilesRendererExperience from './full/FullTilesRendererExperience'
-import SimpleTilesRendererExperience from './simple/SimpleTilesRendererExperience'
 
 const App: FC = () => {
-  const [mode, setMode] = useState<'full' | 'simple'>('full')
+  const [reloadCount, setReloadCount] = useState(0)
 
   return (
     <>
       <div className='mode-toggle'>
         <button
           type='button'
-          data-active={mode === 'full'}
           onClick={() => {
-            setMode('full')
+            setReloadCount(previous => previous + 1)
           }}
         >
-          Full Experience
-        </button>
-        <button
-          type='button'
-          data-active={mode === 'simple'}
-          onClick={() => {
-            setMode('simple')
-          }}
-        >
-          Simple Preview
+          Reload Experience
         </button>
       </div>
-      {mode === 'full' ? (
-        <FullTilesRendererExperience />
-      ) : (
-        <SimpleTilesRendererExperience />
-      )}
+      <FullTilesRendererExperience key={reloadCount} />
     </>
   )
 }
