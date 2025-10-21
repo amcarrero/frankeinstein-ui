@@ -107,8 +107,23 @@ const OverlayApp = (): ReactElement => {
     if (view !== 'questions') {
       return
     }
+
+    const existingAnswer = answers[currentIndex]
+    if (existingAnswer) {
+      setCurrentValue(existingAnswer.value)
+      return
+    }
+
+    if (currentIndex > 0) {
+      const previousAnswer = answers[currentIndex - 1]
+      if (previousAnswer) {
+        setCurrentValue(previousAnswer.value)
+        return
+      }
+    }
+
     setCurrentValue(QUESTION_DEFAULT)
-  }, [currentIndex, view])
+  }, [answers, currentIndex, view])
 
   const question = QUESTIONS[currentIndex] ?? QUESTIONS[0]
 
