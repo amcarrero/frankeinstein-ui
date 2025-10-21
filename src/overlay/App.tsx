@@ -87,7 +87,7 @@ const OverlayApp = (): ReactElement => {
   const [currentValue, setCurrentValue] = useState(initialValue)
 
   const postReplacementModel = useCallback((modelPath: string) => {
-    const rotation = modelPath.includes('sample-4') ? 30 : 120
+    const rotation = modelPath.includes('clear') ? 30 : 120
     fetch(REPLACEMENT_MODEL_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -100,7 +100,7 @@ const OverlayApp = (): ReactElement => {
   }, [])
 
   useEffect(() => {
-    postReplacementModel('/sample-4.glb')
+    postReplacementModel('clear')
   }, [postReplacementModel])
 
   useEffect(() => {
@@ -163,7 +163,7 @@ const OverlayApp = (): ReactElement => {
   )
 
   const handleRestart = useCallback(() => {
-    postReplacementModel('/sample-4.glb')
+    postReplacementModel('clear')
     setAnswers([])
     setCurrentIndex(0)
     setResultData(null)

@@ -89,13 +89,14 @@ const REPLACEMENT_OPTIONS: Record<string, ReplacementModelKey> = {
   'Volpe 3': 'volpeConcept'
 }
 
+
 const Scene: FC<SceneProps> = ({
   exposure = 60,
-  longitude = -71.08540479612309,
-  latitude = 42.36392670841971,
-  heading = -155,
-  pitch = -35,
-  distance = 1000,
+  longitude = -71.0845,
+  latitude = 42.3645,
+  heading = -125,
+  pitch = -40,
+  distance = 300,
   coverage = 0.3,
   dayOfYear = 1,
   timeOfDay = 7.6,
@@ -205,6 +206,20 @@ const Scene: FC<SceneProps> = ({
   const replacementVisible =
     baseReplacementVisibility &&
     (remoteVisibilityPreference ?? replacementEnabled)
+  const invalidate = useThree(state => state.invalidate)
+  // Ensure demand-driven canvas renders when remote overrides change.
+  useEffect(() => {
+    invalidate()
+  }, [
+    invalidate,
+    replacementVisible,
+    effectiveModelPath,
+    effectiveScale,
+    effectiveRotation,
+    effectiveElevation,
+    remoteReplacementOverrides?.cleared,
+    remoteReplacementOverrides?.visible
+  ])
   const replacementDefaultsApplied = useRef(false)
   useEffect(() => {
     if (replacementDefaultsApplied.current) {
