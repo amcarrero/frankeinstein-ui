@@ -99,7 +99,7 @@ const Scene: FC<SceneProps> = ({
   distance = 300,
   coverage = 0.3,
   dayOfYear = 1,
-  timeOfDay = 7.6,
+  timeOfDay = 11,
   ...localDate
 }) => {
   const renderer = useThree(({ gl }) => gl)

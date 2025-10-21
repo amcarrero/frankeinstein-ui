@@ -16,7 +16,7 @@ export function useCloudsControls(
 ): [CloudsControlValues, Partial<CloudsProps>] {
   const { enabled, coverage: coverageControl, animate: animateControl } =
     useControls('clouds', {
-      enabled: true,
+      enabled: false,
       coverage: { value: coverage, min: 0, max: 1, step: 0.01 },
       animate: animate
     }, { collapsed: true })
