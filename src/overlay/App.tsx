@@ -48,7 +48,7 @@ interface ResultData {
   program_table?: { friendly?: ProgramEntry[] | null }
 }
 
-type ViewState = 'questions' | 'results'
+type ViewState = 'intro' | 'questions' | 'resultsModel' | 'resultsData'
 
 const QUESTIONS: readonly Question[] = [
   {
@@ -73,7 +73,7 @@ const QUESTIONS: readonly Question[] = [
   }
 ] as const satisfies readonly Question[]
 
-const INITIAL_VIEW: ViewState = 'questions'
+const INITIAL_VIEW: ViewState = 'intro'
 
 const OverlayApp = (): ReactElement => {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -169,7 +169,7 @@ const OverlayApp = (): ReactElement => {
     setResultData(null)
     setSubmitError(null)
     setIsSubmitting(false)
-    setView('questions')
+    setView('intro')
   }, [postReplacementModel])
 
   const handleConfirm = useCallback(async () => {
@@ -178,8 +178,16 @@ const OverlayApp = (): ReactElement => {
     }
 
     console.log('Confirm clicked in view', view)
+    if (view === 'intro') {
+      setView('questions')
+      return
+    }
+    if (view === 'resultsModel') {
+      setView('resultsData')
+      return
+    }
     // handle restart
-    if (view === 'results') {
+    if (view === 'resultsData') {
       handleRestart()
       return
     }
@@ -195,8 +203,8 @@ const OverlayApp = (): ReactElement => {
     setAnswers(updatedAnswers)
 
     if (currentIndex === QUESTIONS.length - 1) {
-      setView('results')
-      await submitAnswers(updatedAnswers)
+      setView('resultsModel')
+      void submitAnswers(updatedAnswers)
       return
     }
 
@@ -254,14 +262,56 @@ const OverlayApp = (): ReactElement => {
   })
 
   useEffect(() => {
-    if (view === 'results') {
+    if (view === 'resultsModel') {
       const randomIndex = Math.floor(Math.random() * RESULTS_MODEL_OPTIONS.length)
       const selectedModel = RESULTS_MODEL_OPTIONS[randomIndex]
       postReplacementModel(selectedModel)
     }
   }, [view, postReplacementModel])
 
-  if (view === 'results') {
+  if (view === 'intro') {
+    return (
+      <div className="app-shell">
+        <main className="intro-screen">
+          <div className="intro-content">
+            <h1 className="intro-title">Dynamic Zoning</h1>
+            <h2 className="intro-subtitle">Answer Questions and Obtain a Development Proposal</h2>
+            <p className="intro-message">Press Button to Continue</p>
+          </div>
+          <footer className="intro-footer">
+            <button type="button" className="confirm-button" onClick={handleConfirm}>
+              <span className="sr-only">Start questionnaire</span>
+            </button>
+          </footer>
+        </main>
+      </div>
+    )
+  }
+
+  if (view === 'resultsModel') {
+    return (
+      <div className="app-shell">
+        <main className="results-model-screen">
+          <div className="results-model-content">
+            <h1 className="results-model-title">This is your site</h1>
+            {isSubmitting && (
+              <p className="api-status">Generating proposal…</p>
+            )}
+            {submitError && !isSubmitting && (
+              <p className="api-status error">{submitError}</p>
+            )}
+          </div>
+          <footer className="results-footer">
+            <button type="button" className="confirm-button" onClick={handleConfirm}>
+              <span className="sr-only">View proposal details</span>
+            </button>
+          </footer>
+        </main>
+      </div>
+    )
+  }
+
+  if (view === 'resultsData') {
     return (
       <div className="app-shell">
         <main className="results-screen">
