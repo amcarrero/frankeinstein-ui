@@ -282,14 +282,10 @@ const Scene: FC<SceneProps> = ({
 
   const exportClippedArea = useCallback(async () => {
     if (clippingPlanes == null || clippingPlanes.length === 0) {
-      console.warn(
-        'Clipping must be enabled before exporting the clipped region.'
-      )
       return
     }
     const tiles = tilesRef.current
     if (tiles == null) {
-      console.warn('Tiles are not ready yet; try again in a moment.')
       return
     }
     const slug = polygonKey
@@ -303,8 +299,8 @@ const Scene: FC<SceneProps> = ({
         planes: clippingPlanes,
         fileName: `clipped-${safeSlug}-${mode.replace(/\s+/g, '-')}.glb`
       })
-    } catch (error) {
-      console.error('Failed to export clipped region:', error)
+    } catch {
+      // Ignore export failures.
     }
   }, [clippingPlanes, mode, polygonKey])
 

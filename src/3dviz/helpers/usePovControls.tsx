@@ -46,9 +46,7 @@ export function usePovControls(
               `distance={${Math.round(pov.distance)}}`
             ].join('\n')
           )
-          .catch((error: unknown) => {
-            console.error(error)
-          })
+          .catch(() => undefined)
       })
     },
     folderSettings

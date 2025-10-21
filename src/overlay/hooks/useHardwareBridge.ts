@@ -36,8 +36,7 @@ const parseMessage = (event: MessageEvent<string>): HardwareMessage | null => {
       return null
     }
     return { type, value: rawValue }
-  } catch (error) {
-    console.warn('Hardware bridge received malformed payload', event.data, error)
+  } catch {
     return null
   }
 }

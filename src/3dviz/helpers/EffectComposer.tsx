@@ -56,7 +56,6 @@ if (!composerPrototype.__safeAddPassApplied) {
       const retriablePass = pass as RetriablePass
       retriablePass.__addPassRetryCount = (retriablePass.__addPassRetryCount ?? 0) + 1
       if (retriablePass.__addPassRetryCount > 60) {
-        console.warn('EffectComposer renderer unavailable after multiple attempts; skipping pass initialization.')
         return
       }
       requestAnimationFrame(() => {
@@ -71,7 +70,6 @@ if (!composerPrototype.__safeAddPassApplied) {
       const retriablePass = pass as RetriablePass
       retriablePass.__addPassRetryCount = (retriablePass.__addPassRetryCount ?? 0) + 1
       if (retriablePass.__addPassRetryCount > 60) {
-        console.warn('EffectComposer context unavailable after multiple attempts; skipping pass initialization.')
         return
       }
       requestAnimationFrame(() => {
@@ -135,8 +133,7 @@ export const EffectComposer: FC<
   const initialContextAvailable = useMemo(() => {
     try {
       return renderer.getContext() != null
-    } catch (error) {
-      console.warn('Unable to query WebGL context availability:', error)
+    } catch {
       return false
     }
   }, [renderer])
@@ -170,7 +167,6 @@ export const EffectComposer: FC<
   useEffect(() => {
     const canvas = renderer.domElement
     const handleLost = () => {
-      console.warn('WebGL context lost; disabling postprocessing until restored.')
       setHasContext(false)
     }
     const handleRestored = () => {
@@ -202,7 +198,6 @@ export const EffectComposer: FC<
     const normalPass = composer.passes.find(pass => pass instanceof NormalPass)
     if (normalPass == null) {
       // Normal pass may not be available if postprocessing disables it.
-      console.warn('EffectComposer did not expose a NormalPass; normals will use default precision.')
       return
     }
     const typedNormalPass = normalPass as NormalPass & {
@@ -219,10 +214,6 @@ export const EffectComposer: FC<
       renderer?.extensions?.has?.('OES_texture_half_float') === true
     if (supportsHalfFloat) {
       typedNormalPass.renderTarget.texture.type = HalfFloatType
-    } else {
-      console.warn(
-        'Half-float textures are not supported; using default precision for normal pass.'
-      )
     }
   }, [hasContext, renderer])
 

@@ -114,8 +114,6 @@ function createPolygonRegion(
     planes.push(plane)
   }
   const centerDistances = planes.map(plane => plane.distanceToPoint(center))
-  // eslint-disable-next-line no-console
-  import.meta.env.DEV && console.debug('[usePolygonClipping] center distances', centerDistances)
   const needsFlip = centerDistances.some(distance => distance >= 0)
   if (needsFlip) {
     planes.forEach(plane => {
@@ -201,10 +199,6 @@ export function usePolygonClipping(): PolygonClippingResult {
   }, [definition, enabled, invertNormals])
 
   const clippingPlanes = region?.planes
-
-  // eslint-disable-next-line no-console
-  import.meta.env.DEV &&
-    console.debug('[usePolygonClipping] enabled', enabled, 'polygon', polygonKey, 'planes', clippingPlanes?.length ?? 0)
 
   const { gl, invalidate } = useThree()
   useEffect(() => {

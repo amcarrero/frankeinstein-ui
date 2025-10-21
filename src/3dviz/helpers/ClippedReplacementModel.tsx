@@ -123,24 +123,6 @@ export const ClippedReplacementModel: FC<ClippedReplacementModelProps> = ({
         object.castShadow = true
         object.receiveShadow = true
         object.layers.enable(REPLACEMENT_LIGHTING_MASK_LAYER)
-        if (import.meta.env.DEV && object.material != null) {
-          const mats = Array.isArray(object.material)
-            ? object.material
-            : [object.material]
-          mats.forEach(material => {
-            const anyMaterial = material as Record<string, unknown>
-            const map = (material as { map?: { name?: string } }).map
-            // eslint-disable-next-line no-console
-            console.debug('[ClippedReplacementModel] material', {
-              object: object.name,
-              material: material.name,
-              type: material.type,
-              mapName: map?.name ?? null,
-              hasMap: map != null,
-              color: (anyMaterial.color as { getHexString?: () => string })?.getHexString?.()
-            })
-          })
-        }
         const materials = Array.isArray(object.material)
           ? object.material
           : object.material != null

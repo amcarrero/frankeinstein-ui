@@ -59,10 +59,6 @@ function applyClippingPlanes(
       })
     }
   })
-  if (import.meta.env.DEV && planes != null) {
-    // eslint-disable-next-line no-console
-    console.debug('[Globe] applied clipping planes to', applied, 'materials', 'types', Array.from(materialTypes))
-  }
 }
 
 const dracoLoader = new DRACOLoader()

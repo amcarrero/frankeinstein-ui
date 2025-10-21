@@ -177,7 +177,6 @@ const OverlayApp = (): ReactElement => {
       return
     }
 
-    console.log('Confirm clicked in view', view)
     if (view === 'intro') {
       setView('questions')
       return
