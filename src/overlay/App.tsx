@@ -377,11 +377,12 @@ const OverlayApp = (): ReactElement => {
                 <span>{QUESTION_MAX}</span>
               </div>
             </div>
-            <button type="button" className="confirm-button" onClick={handleConfirm}>
-              <span className="sr-only">Confirm selection</span>
-            </button>
           </div>
         </div>
+        {/* Fixed confirm button for question view */}
+        <button type="button" className="confirm-button" onClick={handleConfirm}>
+          <span className="sr-only">Confirm selection</span>
+        </button>
       </main>
     </div>
   )

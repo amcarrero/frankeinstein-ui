@@ -158,20 +158,26 @@
 }
 
 .question-controls {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 300px;
   margin-top: 8rem;
-  margin-left: 10rem;
   pointer-events: auto;
+  z-index: 100;
+  background: rgba(0,0,0,0.01); /* subtle background to ensure stacking */
+  overflow: visible;
 }
 
 .slider-area {
-  flex: 0 1 840px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100%, 840px);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
+  z-index: 1;
 }
 
 .slider-label {
@@ -220,8 +226,9 @@
 }
 
 .confirm-button {
-  flex: 0 0 auto;
-  position: relative;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
   width: clamp(4rem, 8vw, 5rem);
   height: clamp(4rem, 8vw, 5rem);
   border-radius: 50%;
@@ -229,8 +236,12 @@
   background: linear-gradient(135deg, #22d3ee 0%, #6366f1 100%);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  margin-left: 1rem;
   pointer-events: auto;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
 }
 
 .confirm-button:hover,
