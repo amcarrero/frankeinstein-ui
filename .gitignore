@@ -30,3 +30,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# Flake and direnv
+.direnv/
+flake.lock
