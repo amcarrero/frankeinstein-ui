@@ -7,9 +7,7 @@ const App: FC = () => {
   return (
     <div className='root-shell'>
       <div className='background-layer'>
-        <Suspense fallback={<div className='loading-banner'>Loading visualization…</div>}>
           <ThreeDVizApp />
-        </Suspense>
       </div>
       <div className='overlay-layer'>
         <OverlayExperience />
