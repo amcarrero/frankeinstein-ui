@@ -50,6 +50,22 @@ interface ResultData {
 
 type ViewState = 'intro' | 'questions' | 'resultsModel' | 'resultsData'
 
+const SUMMARY_TRADITIONAL = {
+	"Stories": 4,
+	"MRU Stories": 4,
+	"NPV": 22820057.0936,
+	"IRR": 0.1537,
+	"Likelihood of Construction": 0.1881
+}
+
+const PROGRAM_TRADITIONAL = [
+  {"name": "MRU", "Number": 48, "Size": 36000},
+  {"name": "Micro Units", "Number": 0, "Size": 0},
+  {"name": "Grocery Store", "Number": 0, "Size": 0},
+  {"name": "Community Center", "Number": 0, "Size": 0},
+  {"name": "Park/Plaza", "Number": 0, "Size": 0}
+]
+
 const QUESTIONS: readonly Question[] = [
   {
     id: 'housingMicro',
@@ -200,7 +216,7 @@ const OverlayApp = (): ReactElement => {
       setView('resultsData')
       return
     }
-    // handle restart
+
     if (view === 'resultsData') {
       handleRestart()
       return
@@ -227,20 +243,6 @@ const OverlayApp = (): ReactElement => {
 
   const summaryFriendly = resultData?.summary_table?.friendly ?? null
   const programFriendly = resultData?.program_table?.friendly ?? []
-
-  const formatValue = (value: unknown): string => {
-    if (value === null || value === undefined) {
-      return '—'
-    }
-
-    if (typeof value === 'number') {
-      return Number.isInteger(value)
-        ? value.toString()
-        : value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-    }
-
-    return String(value)
-  }
 
   const translateHardwareValue = useCallback((rawValue: unknown) => {
     const numericValue = Number(rawValue)
@@ -329,43 +331,10 @@ const OverlayApp = (): ReactElement => {
     return (
       <div className="app-shell">
         <main className="results-screen">
-          <h1 className="results-title">Results</h1>
+          <h1 className="results-title">Project Breakdown</h1>
           <div className="results-body">
-            <section className="results-section">
-              <h2 className="results-subtitle">Suggested development mix</h2>
-              {isSubmitting && (
-                <p className="api-status">Generating proposal…</p>
-              )}
-              {submitError && !isSubmitting && (
-                <p className="api-status error">{submitError}</p>
-              )}
-              {summaryFriendly && !isSubmitting && !submitError && (
-                <dl className="summary-grid">
-                  {Object.entries(summaryFriendly).map(([label, value]) => (
-                    <div className="summary-row" key={label}>
-                      <dt>{label}</dt>
-                      <dd>{formatValue(value)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-              {programFriendly.length > 0 && !isSubmitting && !submitError && (
-                <div className="program-table">
-                  <div className="program-row program-header">
-                    <span>Program</span>
-                    <span>Number</span>
-                    <span>Size (sq ft)</span>
-                  </div>
-                  {programFriendly.map((entry) => (
-                    <div className="program-row" key={entry.name}>
-                      <span>{entry.name}</span>
-                      <span>{formatValue(entry.Number)}</span>
-                      <span>{formatValue(entry.Size)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+            {renderResult("Traditional Zoning",SUMMARY_TRADITIONAL, PROGRAM_TRADITIONAL, "#ff0000")}
+            {renderResult("Dynamic Zoning",summaryFriendly, programFriendly, "#0B6E4F", submitError, isSubmitting)}
           </div>
           <footer className="results-footer">
                 <button type="button" className="confirm-button" onClick={handleConfirm}>
@@ -417,6 +386,106 @@ const OverlayApp = (): ReactElement => {
     </div>
   )
 }
+
+function renderResult(title, summary, program, color="#ffffff", submitError = false, isSubmitting = false) {
+
+  const likelihood = "Likelihood of Construction"
+
+  const mruLabel = program["MRU"]
+
+  program["Market Rate Housing Units"] = mruLabel
+
+  delete program.MRU
+
+
+ return (
+     <section className="results-section">
+      <h2 className="results-subtitle">{title}</h2>
+      {isSubmitting && (
+        <p className="api-status">Generating proposal…</p>
+      )}
+      {submitError && !isSubmitting && (
+        <p className="api-status error">{submitError}</p>
+      )}
+
+      {summary && !isSubmitting && !submitError && (
+        <dl className="summary-grid">
+		<div className="summary-row">
+			<dt>Stories</dt><dd style={{color: color}}>{formatValueWithHint(summary["Stories"], "Stories")}</dd>
+			<dt>{likelihood}</dt><dd style={{color:color}}>{formatValueWithHint(summary[likelihood], likelihood)}</dd>
+		</div>
+        </dl>
+      )}
+
+      {program.length > 0 && !isSubmitting && !submitError && (
+        <div className="program-table">
+          <div className="program-row program-header">
+            <span>Program</span>
+            <span>Number</span>
+          </div>
+          {program.map((entry) => (
+            <div className="program-row" key={entry.name}>
+              <span>{entry.name}</span>
+              <span>{formatValue(entry.Number)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+ )
+}
+
+function formatDollar(amount, locales = 'en-US', currencySymbol = '$', spaceAfterSymbol = true) {
+  // Convert numeric-string inputs to number
+  const num = typeof amount === 'string' ? Number(amount.replace(/[^0-9.-]/g, '')) : Number(amount);
+  if (!isFinite(num)) return amount + ""; // return original if not a valid number
+
+  const formatted = new Intl.NumberFormat(locales, {
+    maximumFractionDigits: 0, // no cents; change to 2 if you want cents shown
+    roundingMode: 'halfExpand' // for modern browsers; increases clarity of intent
+  }).format(Math.round(num)); // round to integer
+
+  return currencySymbol + (spaceAfterSymbol ? ' ' : '') + formatted;
+}
+
+const formatValueWithHint = (value: unknown, hint: string): string => {
+	switch (hint) {
+		case "NPV":
+		case "dollars":
+			return formatDollar(value)
+		case "MRU Stories": // just the MRU Story??
+		case "stories":
+		case "Stories":
+		case "story":
+			const storyNum = Math.ceil(value)
+			if (storyNum < 2) {
+				return "one story"
+			} else {
+				return storyNum + " stories"
+			}
+		case "IRR":
+		case "Likelihood of Construction":
+		case "percentage":
+			const percentage = Math.floor(value * 100.0)
+			return percentage + " %"
+		default:
+			return value + ""
+	}
+}
+
+const formatValue = (value: unknown): string => {
+    if (value === null || value === undefined) {
+      return '—'
+    }
+
+    if (typeof value === 'number') {
+      return Number.isInteger(value)
+        ? value.toString()
+        : value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    }
+
+    return String(value)
+  }
 
 const App = (): ReactElement => {
   return (
