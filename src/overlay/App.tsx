@@ -70,22 +70,22 @@ const QUESTIONS: readonly Question[] = [
   {
     id: 'housingMicro',
     apiKey: 'ranking_Housing_Micro',
-    prompt: 'How much do you prioritize affordable housing for students?'
+    prompt: 'Affordable Housing'
   },
   {
     id: 'inBuildingGrocery',
     apiKey: 'ranking_InBuilding_Grocery',
-    prompt: 'How much do you prioritize having groceries nearby?'
+    prompt: 'Grocery Store'
   },
   {
     id: 'communityCenter',
     apiKey: 'ranking_InBuilding_CommunityCenter',
-    prompt: 'How much do you prioritize having a community center?'
+    prompt: 'Community Center'
   },
   {
     id: 'parkPlaza',
     apiKey: 'ranking_OffSite_ParkPlaza',
-    prompt: 'How much do you prioritize having a public plaza?'
+    prompt: 'Parks and Plaza'
   }
 ] as const satisfies readonly Question[]
 
@@ -291,8 +291,8 @@ const OverlayApp = (): ReactElement => {
         <main className="intro-screen">
           <div className="intro-content">
             <h1 className="intro-title">Dynamic Zoning</h1>
-            <h2 className="intro-subtitle">Answer Questions and Obtain a Development Proposal</h2>
-            <p className="intro-message">Press Button to Continue</p>
+            <h2 className="intro-subtitle">Using the slider, rate the different amenities/benefits to have them built in exchange of development.</h2>
+            <p className="intro-message">Push Button to Start Rating Amenities</p>
           </div>
           <footer className="intro-footer">
             <button type="button" className="confirm-button" onClick={handleConfirm}>
@@ -309,12 +309,15 @@ const OverlayApp = (): ReactElement => {
       <div className="app-shell">
         <main className="results-model-screen">
           <div className="results-model-content">
-            <h1 className="results-model-title">This is your site</h1>
+            <div className="results-model-title">Developer Response</div>
             {isSubmitting && (
               <p className="api-status">Generating proposal…</p>
             )}
             {submitError && !isSubmitting && (
               <p className="api-status error">{submitError}</p>
+            )}
+            {!isSubmitting && (
+              <p className="api-status">Generating proposal done!</p>
             )}
           </div>
           <footer className="results-footer">
@@ -331,10 +334,10 @@ const OverlayApp = (): ReactElement => {
     return (
       <div className="app-shell">
         <main className="results-screen">
-          <h1 className="results-title">Project Breakdown</h1>
+          <div className="results-title">Project Breakdown</div>
           <div className="results-body">
-            {renderResult("Traditional Zoning",SUMMARY_TRADITIONAL, PROGRAM_TRADITIONAL, "#ff0000")}
-            {renderResult("Dynamic Zoning",summaryFriendly, programFriendly, "#0B6E4F", submitError, isSubmitting)}
+            {renderResult("Traditional Zoning",SUMMARY_TRADITIONAL, PROGRAM_TRADITIONAL, "#EF1300")}
+            {renderResult("Dynamic Zoning",summaryFriendly, programFriendly, "#00FF55", submitError, isSubmitting)}
           </div>
           <footer className="results-footer">
                 <button type="button" className="confirm-button" onClick={handleConfirm}>
@@ -356,7 +359,10 @@ const OverlayApp = (): ReactElement => {
             </span>
             <span className="hardware-status">Hardware: {hardwareStatus}</span>
           </div>
+          <div>
           <h1 className="question-prompt">{question.prompt}</h1>
+          <h2>How important is this to you?</h2>
+          </div>
           <div className="question-controls">
             <div className="slider-area">
               <label className="slider-label" htmlFor="question-slider">
@@ -373,8 +379,8 @@ const OverlayApp = (): ReactElement => {
                 className="slider"
               />
               <div className="slider-scale">
-                <span>{QUESTION_MIN}</span>
-                <span>{QUESTION_MAX}</span>
+                <span>LOW</span>
+                <span>HIGH</span>
               </div>
             </div>
           </div>
@@ -391,13 +397,11 @@ const OverlayApp = (): ReactElement => {
 function renderResult(title, summary, program, color="#ffffff", submitError = false, isSubmitting = false) {
 
   const likelihood = "Likelihood of Construction"
-
   const mruLabel = program["MRU"]
-
   program["Market Rate Housing Units"] = mruLabel
+  const [market, ...rest] = program
 
-  delete program.MRU
-
+  console.log(program)
 
  return (
      <section className="results-section">
@@ -424,7 +428,13 @@ function renderResult(title, summary, program, color="#ffffff", submitError = fa
             <span>Program</span>
             <span>Number</span>
           </div>
-          {program.map((entry) => (
+
+            <div className="program-row" key={"market"} style={{color: color, marginBottom: "10px"}}>
+              <span>Market Rate Units</span>
+              <span>{formatValue(market.Number)}</span>
+            </div>
+
+          {rest.map((entry) => (
             <div className="program-row" key={entry.name}>
               <span>{entry.name}</span>
               <span>{formatValue(entry.Number)}</span>
@@ -462,7 +472,7 @@ const formatValueWithHint = (value: unknown, hint: string): string => {
 			if (storyNum < 2) {
 				return "one story"
 			} else {
-				return storyNum + " stories"
+				return storyNum + ""
 			}
 		case "IRR":
 		case "Likelihood of Construction":
