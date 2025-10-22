@@ -20,7 +20,6 @@ import {
   AerialPerspective,
   Atmosphere,
   Sky,
-  Stars,
   type AtmosphereApi
 } from '@takram/three-atmosphere/r3f'
 import { Clouds } from '@takram/three-clouds/r3f'
@@ -36,7 +35,8 @@ import { SRGBColorSpace } from 'three'
 import { EffectComposer } from '../helpers/EffectComposer'
 import {
   ClippedReplacementModel,
-  DepthMask
+  DepthMask,
+  REPLACEMENT_LIGHTING_MASK_LAYER
 } from '../helpers/ClippedReplacementModel'
 import { Globe } from '../helpers/Globe'
 import { GoogleMapsAPIKeyPrompt } from '../helpers/GoogleMapsAPIKeyPrompt'
@@ -342,9 +342,26 @@ const Scene: FC<SceneProps> = ({
   })
 
   const atmosphereRef = useRef<AtmosphereApi>(null)
+  const gl = useThree(({ gl }) => gl)
+  const scene = useThree(({ scene }) => scene)
   useFrame(() => {
     atmosphereRef.current?.updateByDate(new Date(motionDate.get()))
   })
+  useFrame(
+    () => {
+      if (!replacementVisible) {
+        return
+      }
+      const previousAutoClear = gl.autoClear
+      const previousMask = camera.layers.mask
+      gl.autoClear = false
+      camera.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+      gl.render(scene, camera)
+      camera.layers.mask = previousMask
+      gl.autoClear = previousAutoClear
+    },
+    1
+  )
 
   return (
     <Atmosphere ref={atmosphereRef} correctAltitude={correctAltitude}>

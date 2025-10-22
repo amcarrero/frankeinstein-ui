@@ -1,7 +1,17 @@
 import { useGLTF } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
-import { useEffect, useMemo, type FC } from 'react'
-import { Box3, MathUtils, Mesh, Object3D, Vector3, BufferGeometry, Float32BufferAttribute, MeshBasicMaterial } from 'three'
+import { useEffect, useMemo, useRef, type FC } from 'react'
+import {
+  Box3,
+  MathUtils,
+  Mesh,
+  Object3D,
+  Vector3,
+  BufferGeometry,
+  Float32BufferAttribute,
+  MeshBasicMaterial,
+  Group
+} from 'three'
 import { DRACOLoader, GLTFLoader, KTX2Loader } from 'three-stdlib'
 
 import type { PolygonRegion } from './usePolygonClipping'
@@ -54,9 +64,6 @@ export const DepthMask: FC<{ region: PolygonRegion; elevation?: number; visible?
         material={material}
         renderOrder={-100}
         frustumCulled={false}
-        onUpdate={mesh => {
-          mesh.layers.enable(REPLACEMENT_LIGHTING_MASK_LAYER)
-        }}
       />
     </group>
   )
@@ -117,12 +124,12 @@ export const ClippedReplacementModel: FC<ClippedReplacementModelProps> = ({
   const { scene } = useGLTF(normalizedModelPath, true, true, extendLoader)
   const model = useMemo(() => {
     const clone = scene.clone(true)
-    clone.layers.enable(REPLACEMENT_LIGHTING_MASK_LAYER)
+    clone.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
     clone.traverse(object => {
       if (object instanceof Mesh) {
         object.castShadow = true
         object.receiveShadow = true
-        object.layers.enable(REPLACEMENT_LIGHTING_MASK_LAYER)
+        object.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
         const materials = Array.isArray(object.material)
           ? object.material
           : object.material != null
@@ -169,17 +176,31 @@ export const ClippedReplacementModel: FC<ClippedReplacementModelProps> = ({
   const pivotY = -metrics.minY
   const pivotZ = -metrics.center.z
 
+  const groupRef = useRef<Group>(null)
+
   return (
     <group
+      ref={groupRef}
       matrixAutoUpdate={false}
       matrix={region.orientation}
       visible={visible}
       onUpdate={group => {
-        group.layers.enable(REPLACEMENT_LIGHTING_MASK_LAYER)
+        group.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
       }}
     >
-      <ambientLight intensity={2} />
-      <directionalLight position={[0, 500, 200]} intensity={1.5}  />
+      <ambientLight
+        intensity={2}
+        onUpdate={light => {
+          light.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+        }}
+      />
+      <directionalLight
+        position={[0, 500, 200]}
+        intensity={1.5}
+        onUpdate={light => {
+          light.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+        }}
+      />
       <spotLight
         position={[0, KEY_LIGHT_HEIGHT, 0]}
         intensity={5}
@@ -189,12 +210,29 @@ export const ClippedReplacementModel: FC<ClippedReplacementModelProps> = ({
         castShadow
         target-position={[0, 0, 0]}
         onUpdate={light => {
-          light.layers.enable(REPLACEMENT_LIGHTING_MASK_LAYER)
+          light.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+          light.target.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
         }}
       />
-      <group position={[localCenterX, 0, localCenterZ]}>
-        <group rotation-y={rotationRad} position={[0, elevation, 0]}>
-          <group scale={[finalScale, finalScale, finalScale]}>
+      <group
+        position={[localCenterX, 0, localCenterZ]}
+        onUpdate={inner => {
+          inner.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+        }}
+      >
+        <group
+          rotation-y={rotationRad}
+          position={[0, elevation, 0]}
+          onUpdate={inner => {
+            inner.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+          }}
+        >
+          <group
+            scale={[finalScale, finalScale, finalScale]}
+            onUpdate={inner => {
+              inner.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+            }}
+          >
             <primitive object={model} position={[pivotX, pivotY, pivotZ]} />
           </group>
         </group>
@@ -208,4 +246,3 @@ useGLTF.preload('/sample-4.glb')
 useGLTF.preload('/sample-3.glb')
 useGLTF.preload('/sample-2.glb')
 useGLTF.preload('/sample.glb')
-
