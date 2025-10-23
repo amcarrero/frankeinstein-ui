@@ -266,6 +266,24 @@ const Scene: FC<SceneProps> = ({
   )
   const [{ enabled: cloudsEnabled, toneMapping: cloudsToneMapping }, cloudsProps] =
     useCloudsControls({ coverage, animate: true })
+  const localWeatherVelocity = (
+    cloudsProps as { localWeatherVelocity?: [number, number] }
+  ).localWeatherVelocity
+  const velocityX = localWeatherVelocity?.[0] ?? 0
+  const velocityY = localWeatherVelocity?.[1] ?? 0
+  useEffect(() => {
+    if (!cloudsEnabled || (velocityX === 0 && velocityY === 0)) {
+      return
+    }
+    // frameloop='demand' stops RAF, so manually invalidate to animate clouds at ~2 FPS
+    invalidate()
+    const interval = window.setInterval(() => {
+      invalidate()
+    }, 500)
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [cloudsEnabled, velocityX, velocityY, invalidate])
   const {
     enable: enabled,
     sun,
