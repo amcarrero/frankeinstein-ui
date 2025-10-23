@@ -15,7 +15,14 @@ import {
   TilesRenderer
 } from '3d-tiles-renderer/r3f'
 import { useAtomValue, useSetAtom } from 'jotai'
-import { useEffect, useState, type FC, type ReactNode, type Ref } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FC,
+  type ReactNode,
+  type Ref
+} from 'react'
 import { mergeRefs } from 'react-merge-refs'
 import type { Material, Object3D, Plane } from 'three'
 import { Line, LineSegments, Mesh, Points } from 'three'
@@ -118,6 +125,25 @@ export const Globe: FC<GlobeProps> = ({
     }
   }, [tiles, clippingPlanes, clipIntersection])
 
+  const googleCloudAuthArgs = useMemo(
+    () => [
+      {
+        apiToken: apiKey,
+        autoRefreshToken: true
+      }
+    ],
+    [apiKey]
+  )
+
+  const tileCreasedNormalsArgs = useMemo(
+    () => [
+      {
+        creaseAngle: radians(30)
+      }
+    ],
+    []
+  )
+
   return (
     <TilesRenderer
       ref={mergeRefs([ref, setTiles])}
@@ -125,15 +151,12 @@ export const Globe: FC<GlobeProps> = ({
       key={apiKey}
       // The root URL sometimes becomes null without specifying the URL.
       url={`https://tile.googleapis.com/v1/3dtiles/root.json?key=${apiKey}`}
+      errorTarget={2}
+      errorThreshold={1}
     >
       <TilesPlugin
         plugin={GoogleCloudAuthPlugin}
-        args={[
-          {
-            apiToken: apiKey,
-            autoRefreshToken: true
-          }
-        ]}
+        args={googleCloudAuthArgs}
       />
       <TilesPlugin plugin={GLTFExtensionsPlugin} dracoLoader={dracoLoader} />
       <TilesPlugin plugin={TileCompressionPlugin} />
@@ -141,7 +164,7 @@ export const Globe: FC<GlobeProps> = ({
       <TilesPlugin plugin={TilesFadePlugin} />
       <TilesPlugin
         plugin={TileCreasedNormalsPlugin}
-        args={[{ creaseAngle: radians(30) }]}
+        args={tileCreasedNormalsArgs}
       />
       {children}
       <TilesAttributionOverlay />
