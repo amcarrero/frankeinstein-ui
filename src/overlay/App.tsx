@@ -515,7 +515,7 @@ const OverlayApp = (): ReactElement => {
   if (view === "preference") {
     return (
       <div className="app-shell">
-        <main className="question-screen">
+        <main className="question-screen preference-screen">
           <div className="question-content">
             <div className="question-meta">
               <span className="question-progress">Preference</span>
@@ -524,6 +524,20 @@ const OverlayApp = (): ReactElement => {
             <div>
               <h1 className="question-prompt">Which approach do you prefer?</h1>
               <h2>Drag the slider toward Classic or Dynamic zoning.</h2>
+            </div>
+            <div className="preference-summary">
+              {renderPreferenceSummary(
+                "Traditional Zoning",
+                SUMMARY_TRADITIONAL,
+                PROGRAM_TRADITIONAL,
+                "#EF1300",
+              )}
+              {renderPreferenceSummary(
+                "Dynamic Zoning",
+                summaryFriendly,
+                programFriendly,
+                "#00FF55",
+              )}
             </div>
             <div className="question-controls">
               <div className="slider-area">
@@ -611,6 +625,50 @@ const OverlayApp = (): ReactElement => {
     </div>
   );
 };
+
+function renderPreferenceSummary(
+  title: string,
+  summary: ResultSummary | null,
+  program: ProgramEntry[] | null,
+  highlightColor = "#ffffff",
+): ReactElement {
+  const likelihoodKey = "Likelihood of Construction";
+  const storiesValue = formatValueWithHint(summary?.["Stories"], "Stories");
+  const likelihoodValue = formatValueWithHint(
+    summary?.[likelihoodKey],
+    likelihoodKey,
+  );
+  const normalizedProgram = Array.isArray(program) ? program : [];
+  const amenityPrograms = normalizedProgram.filter(
+    (entry) => entry?.name != null,
+  );
+
+  return (
+    <section className="preference-summary-card">
+      <h3 className="preference-summary-title">{title}</h3>
+      <dl className="preference-summary-metrics">
+        <div className="preference-summary-row">
+          <dt>Stories</dt>
+          <dd style={{ color: highlightColor }}>{storiesValue}</dd>
+        </div>
+        <div className="preference-summary-row">
+          <dt>{likelihoodKey}</dt>
+          <dd style={{ color: highlightColor }}>{likelihoodValue}</dd>
+        </div>
+      </dl>
+      {amenityPrograms.length > 0 && (
+        <ul className="preference-program-list">
+          {amenityPrograms.map((entry, index) => (
+            <li key={`${entry?.name ?? `program-${index}`}`}>
+              <span>{entry?.name ?? "Program"}</span>
+              <span>{formatValue(entry?.Number)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 function renderResult(
   title: string,

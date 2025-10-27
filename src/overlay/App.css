@@ -96,6 +96,83 @@ h2 {
   pointer-events: auto;
 }
 
+.preference-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+  margin-top: clamp(1rem, 3vw, 2rem);
+  pointer-events: auto;
+}
+
+.preference-summary-card {
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 20px;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
+}
+
+.preference-summary-title {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+  font-weight: 600;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.preference-summary-metrics {
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.preference-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.preference-summary-row dt {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(248, 250, 252, 0.65);
+}
+
+.preference-summary-row dd {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.preference-program-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.preference-program-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: rgba(248, 250, 252, 0.85);
+}
+
+.preference-program-list li span:nth-of-type(2) {
+  font-weight: 600;
+  color: #ffffff;
+}
+
 .intro-footer {
   display: flex;
   justify-content: center;
@@ -176,6 +253,25 @@ h2 {
   z-index: 100;
   background: rgba(0, 0, 0, 0.01); /* subtle background to ensure stacking */
   overflow: visible;
+}
+
+.preference-screen .question-content {
+  margin-top: clamp(0.5rem, 2vw, 1.5rem);
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+.preference-screen .question-prompt {
+  margin-top: clamp(3rem, 5vw, 5rem);
+}
+
+.preference-screen .preference-summary {
+  margin-top: clamp(0.75rem, 2vw, 1.5rem);
+  width: min(100%, 960px);
+  align-self: center;
+}
+
+.preference-screen .question-controls {
+  margin-top: clamp(2rem, 5vw, 3.5rem);
 }
 
 .slider-area {
@@ -478,5 +574,9 @@ h2 {
 
   .results-question {
     max-width: 100%;
+  }
+
+  .preference-summary {
+    grid-template-columns: 1fr;
   }
 }
