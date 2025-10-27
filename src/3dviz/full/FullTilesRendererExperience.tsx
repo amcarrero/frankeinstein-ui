@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   type FC
 } from 'react'
@@ -30,7 +31,8 @@ import {
   LensFlare,
   Normal
 } from '@takram/three-geospatial-effects/r3f'
-import { SRGBColorSpace } from 'three'
+import { MeshDepthMaterial, NoBlending, SRGBColorSpace } from 'three'
+import type { Plane } from 'three'
 
 import { EffectComposer } from '../helpers/EffectComposer'
 import {
@@ -89,6 +91,36 @@ const REPLACEMENT_OPTIONS: Record<string, ReplacementModelKey> = {
   'Volpe 3': 'volpeConcept'
 }
 
+
+function useDepthOnlyMaterial(
+  clippingPlanes: Plane[] | undefined,
+  clipIntersection: boolean,
+): MeshDepthMaterial {
+  const material = useMemo(() => {
+    const depthMaterial = new MeshDepthMaterial()
+    depthMaterial.blending = NoBlending
+    depthMaterial.colorWrite = false
+    return depthMaterial
+  }, [])
+
+  useEffect(() => {
+    material.clippingPlanes =
+      clippingPlanes != null && clippingPlanes.length > 0 ? clippingPlanes : null
+    material.clipIntersection = clipIntersection
+    ;(material as MeshDepthMaterial & { clipping?: boolean }).clipping =
+      material.clippingPlanes != null
+    material.needsUpdate = true
+  }, [material, clippingPlanes, clipIntersection])
+
+  useEffect(
+    () => () => {
+      material.dispose()
+    },
+    [material],
+  )
+
+  return material
+}
 
 const Scene: FC<SceneProps> = ({
   exposure = 60,
@@ -279,7 +311,7 @@ const Scene: FC<SceneProps> = ({
     invalidate()
     const interval = window.setInterval(() => {
       invalidate()
-    }, 500)
+    }, 100)
     return () => {
       window.clearInterval(interval)
     }
@@ -362,24 +394,49 @@ const Scene: FC<SceneProps> = ({
   const atmosphereRef = useRef<AtmosphereApi>(null)
   const gl = useThree(({ gl }) => gl)
   const scene = useThree(({ scene }) => scene)
+  const depthOnlyMaterial = useDepthOnlyMaterial(clippingPlanes, clipIntersection)
   useFrame(() => {
     atmosphereRef.current?.updateByDate(new Date(motionDate.get()))
   })
-  useFrame(
-    () => {
-      if (!replacementVisible) {
-        return
-      }
-      const previousAutoClear = gl.autoClear
-      const previousMask = camera.layers.mask
-      gl.autoClear = false
-      camera.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
-      gl.render(scene, camera)
-      camera.layers.mask = previousMask
-      gl.autoClear = previousAutoClear
-    },
-    1
-  )
+  useFrame(() => {
+    if (!replacementVisible) {
+      return
+    }
+    const glContext = gl.getContext?.()
+    if (glContext == null) {
+      return
+    }
+
+    const previousState = {
+      autoClear: gl.autoClear,
+      layersMask: camera.layers.mask,
+      depthTest: glContext.isEnabled(glContext.DEPTH_TEST),
+      depthMask: glContext.getParameter(glContext.DEPTH_WRITEMASK) as boolean,
+      depthFunc: glContext.getParameter(glContext.DEPTH_FUNC) as number,
+      overrideMaterial: scene.overrideMaterial,
+    }
+
+    gl.autoClear = false
+    glContext.enable(glContext.DEPTH_TEST)
+    glContext.depthMask(true)
+    glContext.depthFunc(glContext.LEQUAL)
+
+    scene.overrideMaterial = depthOnlyMaterial
+    gl.render(scene, camera)
+    scene.overrideMaterial = previousState.overrideMaterial
+
+    camera.layers.set(REPLACEMENT_LIGHTING_MASK_LAYER)
+    gl.render(scene, camera)
+
+    glContext.depthFunc(previousState.depthFunc ?? glContext.LEQUAL)
+    glContext.depthMask(previousState.depthMask)
+    if (!previousState.depthTest) {
+      glContext.disable(glContext.DEPTH_TEST)
+    }
+
+    camera.layers.mask = previousState.layersMask
+    gl.autoClear = previousState.autoClear
+  }, 1)
 
   return (
     <Atmosphere ref={atmosphereRef} correctAltitude={correctAltitude}>
@@ -462,7 +519,7 @@ export const FullTilesRendererExperience: FC<SceneProps> = props => {
   useGoogleMapsAPIKeyControls()
   return (
     <>
-      <Canvas frameloop='demand' gl={{ depth: false }}>
+      <Canvas frameloop='demand'>
         <Stats />
         <Scene {...props} />
       </Canvas>
