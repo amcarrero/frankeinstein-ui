@@ -86,6 +86,16 @@ h2 {
   color: rgba(248, 250, 252, 0.75);
 }
 
+.continue-hint {
+  margin: clamp(1.5rem, 3vw, 2.5rem) 0 0;
+  font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(248, 250, 252, 0.8);
+  text-align: center;
+  pointer-events: auto;
+}
+
 .intro-footer {
   display: flex;
   justify-content: center;

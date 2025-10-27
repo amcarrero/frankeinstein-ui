@@ -1,8 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { WebSocketServer, type WebSocket } from 'ws'
+import { WebSocketServer, type WebSocket, type RawData } from 'ws'
+
+import type { SliderRepository, SliderSubmission } from './sliderRepository.js'
 
 const DEFAULT_PORT = 43110
 const WS_PATH = '/replacement-model'
+const SLIDER_PATH = `${WS_PATH}/slider-values`
 const JSON_MIME = 'application/json'
 
 interface ReplacementModelOverrides {
@@ -29,6 +32,11 @@ interface ReplacementModelServerInstance {
   getOverride: () => ReplacementModelOverrides | null
 }
 
+interface ReplacementServerOptions {
+  port?: number
+  sliderRepository?: SliderRepository | null
+}
+
 const corsHeaders = Object.freeze({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
@@ -37,15 +45,16 @@ const corsHeaders = Object.freeze({
 
 let activeInstance: ReplacementModelServerInstance | null = null
 
-export function startReplacementModelServer(options?: {
-  port?: number
-}): ReplacementModelServerInstance {
+export function startReplacementModelServer(
+  options?: ReplacementServerOptions
+): ReplacementModelServerInstance {
   if (activeInstance != null) {
     return activeInstance
   }
 
   const port = resolvePort(options?.port)
   let override: ReplacementModelOverrides | null = null
+  const sliderRepository = options?.sliderRepository ?? null
 
   const httpServer = createServer(async (request, response) => {
     try {
@@ -93,11 +102,25 @@ export function startReplacementModelServer(options?: {
       return
     }
 
-    if (!request.url.startsWith(WS_PATH)) {
-      respondJson(response, 404, { error: 'Not found' })
+    const url = parseRequestUrl(request.url)
+
+    if (url.pathname === WS_PATH) {
+      await handleOverrideRequest(request, response)
       return
     }
 
+    if (url.pathname === SLIDER_PATH) {
+      await handleSliderSubmission(request, response)
+      return
+    }
+
+    respondJson(response, 404, { error: 'Not found' })
+  }
+
+  const handleOverrideRequest = async (
+    request: IncomingMessage,
+    response: ServerResponse
+  ): Promise<void> => {
     if (request.method === 'GET') {
       respondJson(response, 200, { override })
       return
@@ -164,7 +187,59 @@ export function startReplacementModelServer(options?: {
     respondJson(response, 405, { error: 'Unsupported method' })
   }
 
-  const parseCommand = (data: WebSocket.RawData): ReplacementModelCommand => {
+  const handleSliderSubmission = async (
+    request: IncomingMessage,
+    response: ServerResponse
+  ): Promise<void> => {
+    if (request.method !== 'POST') {
+      respondJson(response, 405, { error: 'Unsupported method' })
+      return
+    }
+
+    const body = await readBody(request)
+    let payload: unknown
+    try {
+      payload = JSON.parse(body)
+    } catch {
+      respondJson(response, 400, { error: 'Invalid JSON body' })
+      return
+    }
+
+    let submission: SliderSubmission
+    try {
+      submission = normalizeSliderSubmission(payload)
+    } catch (error) {
+      respondJson(response, 400, {
+        error: error instanceof Error ? error.message : 'Invalid payload'
+      })
+      return
+    }
+
+    if (sliderRepository == null) {
+      respondJson(response, 503, {
+        error: 'Slider submission storage not configured'
+      })
+      return
+    }
+
+    try {
+      await sliderRepository.saveSliderSubmission(submission)
+    } catch (error) {
+      respondJson(response, 500, {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to persist slider submission'
+      })
+      return
+    }
+
+    respondJson(response, 202, {
+      status: 'accepted'
+    })
+  }
+
+  const parseCommand = (data: RawData): ReplacementModelCommand => {
     const text = rawDataToString(data)
     const payload: unknown = JSON.parse(text)
     if (payload == null || typeof payload !== 'object') {
@@ -273,23 +348,36 @@ export function startReplacementModelServer(options?: {
   }
 
   const close = async (): Promise<void> => {
-    await new Promise<void>((resolve, reject) => {
-      wss.clients.forEach(client => client.terminate())
-      wss.close(error => {
-        if (error != null) {
-          reject(error)
-          return
-        }
-        httpServer.close(closeError => {
-          if (closeError != null) {
-            reject(closeError)
-          } else {
-            resolve()
+    try {
+      await new Promise<void>((resolve, reject) => {
+        wss.clients.forEach(client => client.terminate())
+        wss.close(error => {
+          if (error != null) {
+            reject(error)
+            return
           }
+          httpServer.close(closeError => {
+            if (closeError != null) {
+              reject(closeError)
+            } else {
+              resolve()
+            }
+          })
         })
       })
-    })
-    activeInstance = null
+    } finally {
+      activeInstance = null
+      if (sliderRepository != null) {
+        try {
+          await sliderRepository.close()
+        } catch (error) {
+          console.error(
+            '[replacement-model] Error while closing slider repository:',
+            error
+          )
+        }
+      }
+    }
   }
 
   httpServer.on('error', error => {
@@ -328,6 +416,71 @@ const resolvePort = (overridePort?: number): number => {
     }
   }
   return DEFAULT_PORT
+}
+
+const parseRequestUrl = (input: string): URL => new URL(input, 'http://localhost')
+
+const normalizeSliderSubmission = (payload: unknown): SliderSubmission => {
+  if (payload == null || typeof payload !== 'object') {
+    throw new Error('Slider submission payload must be an object')
+  }
+
+  const {
+    sessionId,
+    questionId,
+    question,
+    prompt,
+    questionText,
+    value,
+    recordedAt,
+    submittedAt
+  } = payload as Record<string, unknown>
+
+  if (typeof sessionId !== 'string' || sessionId.trim().length === 0) {
+    throw new Error('sessionId must be a non-empty string')
+  }
+
+  if (typeof questionId !== 'string' || questionId.trim().length === 0) {
+    throw new Error('questionId must be a non-empty string')
+  }
+
+  if (value == null) {
+    throw new Error('value must be provided')
+  }
+
+  const submission: SliderSubmission = {
+    sessionId: sessionId.trim(),
+    questionId: questionId.trim(),
+    value: coerceNumber(value)
+  }
+
+  const questionLabel = questionText ?? question ?? prompt
+  if (questionLabel != null) {
+    if (typeof questionLabel !== 'string' || questionLabel.trim().length === 0) {
+      throw new Error('questionText must be a non-empty string when provided')
+    }
+    submission.questionText = questionLabel
+  }
+
+  const timestampCandidate = submittedAt ?? recordedAt
+  if (timestampCandidate != null) {
+    submission.recordedAt = normalizeDate(timestampCandidate)
+  }
+
+  return submission
+}
+
+const normalizeDate = (value: unknown): Date => {
+  if (value instanceof Date && !Number.isNaN(value.valueOf())) {
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'string') {
+    const candidate = new Date(value)
+    if (!Number.isNaN(candidate.valueOf())) {
+      return candidate
+    }
+  }
+  throw new Error('recordedAt/submittedAt must be a valid date or timestamp')
 }
 
 const normalizeOverrides = (payload: unknown): ReplacementModelOverrides => {
@@ -413,7 +566,7 @@ const readBody = async (request: IncomingMessage): Promise<string> => {
   return Buffer.concat(chunks).toString('utf-8')
 }
 
-const rawDataToString = (data: WebSocket.RawData): string => {
+const rawDataToString = (data: RawData): string => {
   if (typeof data === 'string') {
     return data
   }
