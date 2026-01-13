@@ -11,6 +11,7 @@ services:
     depends_on:
       replacement-server:
         condition: service_started
+    restart: unless-stopped
 
   replacement-server:
     build:
@@ -25,6 +26,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
   db:
     image: postgres:16-alpine
@@ -41,6 +43,7 @@ services:
       retries: 5
     volumes:
       - db-data:/var/lib/postgresql/data
+    restart: unless-stopped
 
 volumes:
   db-data:
