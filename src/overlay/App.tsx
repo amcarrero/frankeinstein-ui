@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactElement,
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
 
 import "./App.css";
 import { useHardwareBridge } from "./hooks/useHardwareBridge";
@@ -24,6 +18,12 @@ const QUESTION_MIN = 0;
 const QUESTION_MAX = 10;
 const QUESTION_STEP = 0.25;
 const QUESTION_DEFAULT = 5;
+
+const PREFERENCE_MIN = 0;
+const PREFERENCE_MAX = 10;
+const PREFERENCE_STEP = 0.5;
+const PREFERENCE_DEFAULT = (PREFERENCE_MIN + PREFERENCE_MAX) / 2;
+const SLIDER_SUBMISSION_ENDPOINT = `${REPLACEMENT_MODEL_ENDPOINT}/slider-values`;
 
 type Question = {
   id: string;
@@ -54,7 +54,12 @@ interface ResultData {
   program_table?: { friendly?: ProgramEntry[] | null };
 }
 
-type ViewState = "intro" | "questions" | "resultsModel" | "resultsData";
+type ViewState =
+  | "intro"
+  | "questions"
+  | "resultsModel"
+  | "resultsData"
+  | "preference";
 
 const SUMMARY_TRADITIONAL = {
   Stories: 4,
@@ -97,6 +102,16 @@ const QUESTIONS: readonly Question[] = [
 
 const INITIAL_VIEW: ViewState = "intro";
 
+const generateSessionId = (): string => {
+  const randomUuid = globalThis.crypto?.randomUUID?.();
+  if (randomUuid) {
+    return randomUuid;
+  }
+  return `session-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+};
+
 const OverlayApp = (): ReactElement => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -104,6 +119,8 @@ const OverlayApp = (): ReactElement => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultData, setResultData] = useState<ResultData | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [preferenceValue, setPreferenceValue] = useState(PREFERENCE_DEFAULT);
+  const [sessionId, setSessionId] = useState<string>(() => generateSessionId());
 
   const initialValue = useMemo(() => QUESTION_DEFAULT, []);
   const [currentValue, setCurrentValue] = useState(initialValue);
@@ -201,6 +218,62 @@ const OverlayApp = (): ReactElement => {
     [buildPayload],
   );
 
+  const persistSliderSubmission = useCallback(
+    async ({
+      questionId,
+      questionText,
+      value,
+    }: {
+      questionId: string;
+      questionText?: string;
+      value: number;
+    }) => {
+      if (!Number.isFinite(value)) {
+        return;
+      }
+      const payload: Record<string, unknown> = {
+        sessionId,
+        questionId,
+        value,
+        recordedAt: new Date().toISOString(),
+      };
+      if (questionText != null) {
+        payload.questionText = questionText;
+      }
+      try {
+        const response = await fetch(SLIDER_SUBMISSION_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          throw new Error(
+            `Failed to persist slider submission for ${questionId} (status ${response.status})`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Unable to record slider submission for ${questionId}`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    },
+    [sessionId],
+  );
+
+  const submitSliderPreference = useCallback(
+    async (value: number) => {
+      await persistSliderSubmission({
+        questionId: "zoningPreference",
+        questionText: "Zoning Preference (Classic vs Dynamic)",
+        value,
+      });
+    },
+    [persistSliderSubmission],
+  );
+
   const handleRestart = useCallback(() => {
     postReplacementModel("clear");
     setAnswers([]);
@@ -208,6 +281,8 @@ const OverlayApp = (): ReactElement => {
     setResultData(null);
     setSubmitError(null);
     setIsSubmitting(false);
+    setPreferenceValue(PREFERENCE_DEFAULT);
+    setSessionId(generateSessionId());
     setView("intro");
   }, [postReplacementModel]);
 
@@ -226,6 +301,12 @@ const OverlayApp = (): ReactElement => {
     }
 
     if (view === "resultsData") {
+      setView("preference");
+      return;
+    }
+
+    if (view === "preference") {
+      await submitSliderPreference(preferenceValue);
       handleRestart();
       return;
     }
@@ -239,6 +320,11 @@ const OverlayApp = (): ReactElement => {
       value: currentValue,
     };
     setAnswers(updatedAnswers);
+    await persistSliderSubmission({
+      questionId: activeQuestion.id,
+      questionText: activeQuestion.prompt,
+      value: currentValue,
+    });
 
     if (currentIndex === QUESTIONS.length - 1) {
       setView("resultsModel");
@@ -253,43 +339,67 @@ const OverlayApp = (): ReactElement => {
     currentValue,
     handleRestart,
     isSubmitting,
+    preferenceValue,
+    persistSliderSubmission,
     submitAnswers,
+    submitSliderPreference,
     view,
   ]);
 
-  const summaryFriendly = resultData?.summary_table?.friendly ?? null;
-  const programFriendly = resultData?.program_table?.friendly ?? [];
+  const summaryFriendly = (resultData?.summary_table?.friendly ??
+    null) as ResultSummary | null;
+  const programFriendlyRaw = resultData?.program_table?.friendly ?? null;
+  const programFriendly = Array.isArray(programFriendlyRaw)
+    ? (programFriendlyRaw as ProgramEntry[])
+    : [];
 
-  const translateHardwareValue = useCallback((rawValue: unknown) => {
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue)) {
-      return null;
-    }
-    const span = QUESTION_MAX - QUESTION_MIN || 1;
-    const clampedSensorValue = Math.max(
-      0,
-      Math.min(numericValue, HARDWARE_SLIDER_MAX),
-    );
-    const scaled =
-      QUESTION_MIN + (clampedSensorValue / HARDWARE_SLIDER_MAX) * span;
-    const stepped = Math.round(scaled / QUESTION_STEP) * QUESTION_STEP;
-    return Number(
-      Math.min(QUESTION_MAX, Math.max(QUESTION_MIN, stepped)).toFixed(4),
-    );
-  }, []);
+  const translateHardwareValue = useCallback(
+    (
+      rawValue: unknown,
+      config?: { min: number; max: number; step: number },
+    ) => {
+      const numericValue = Number(rawValue);
+      if (!Number.isFinite(numericValue)) {
+        return null;
+      }
+      const min = config?.min ?? QUESTION_MIN;
+      const max = config?.max ?? QUESTION_MAX;
+      const step = config?.step ?? QUESTION_STEP;
+      const span = max - min || 1;
+      const clampedSensorValue = Math.max(
+        0,
+        Math.min(numericValue, HARDWARE_SLIDER_MAX),
+      );
+      const scaled = min + (clampedSensorValue / HARDWARE_SLIDER_MAX) * span;
+      const stepped = Math.round(scaled / step) * step;
+      return Number(
+        Math.min(max, Math.max(min, stepped)).toFixed(4),
+      );
+    },
+    [],
+  );
 
   const handleHardwareSlider = useCallback(
     (rawValue: unknown) => {
-      if (view !== "questions") {
+      if (view === "questions") {
+        const translated = translateHardwareValue(rawValue);
+        if (translated !== null) {
+          setCurrentValue(translated);
+        }
         return;
       }
-      const translated = translateHardwareValue(rawValue);
-      if (translated === null) {
-        return;
+      if (view === "preference") {
+        const translated = translateHardwareValue(rawValue, {
+          min: PREFERENCE_MIN,
+          max: PREFERENCE_MAX,
+          step: PREFERENCE_STEP,
+        });
+        if (translated !== null) {
+          setPreferenceValue(translated);
+        }
       }
-      setCurrentValue(translated);
     },
-    [translateHardwareValue, view],
+    [setCurrentValue, setPreferenceValue, translateHardwareValue, view],
   );
 
   const { connectionState: hardwareStatus } = useHardwareBridge({
@@ -350,6 +460,7 @@ const OverlayApp = (): ReactElement => {
             {!isSubmitting && (
               <p className="api-status">Generating proposal done!</p>
             )}
+            <p className="continue-hint">PRESS BUTTON TO CONTINUE</p>
           </div>
           <footer className="results-footer">
             <button
@@ -386,15 +497,79 @@ const OverlayApp = (): ReactElement => {
               isSubmitting,
             )}
           </div>
+          <p className="continue-hint">PRESS BUTTON TO CONTINUE</p>
           <footer className="results-footer">
             <button
               type="button"
               className="confirm-button"
               onClick={handleConfirm}
             >
-              <span className="sr-only">Restart</span>
+              <span className="sr-only">Open preference slider</span>
             </button>
           </footer>
+        </main>
+      </div>
+    );
+  }
+
+  if (view === "preference") {
+    return (
+      <div className="app-shell">
+        <main className="question-screen preference-screen">
+          <div className="question-content">
+            <div className="question-meta">
+              <span className="question-progress">Preference</span>
+              <span className="hardware-status">Hardware: {hardwareStatus}</span>
+            </div>
+            <div>
+              <h1 className="question-prompt">Which approach do you prefer?</h1>
+              <h2>Drag the slider toward Classic or Dynamic zoning.</h2>
+            </div>
+            <div className="preference-summary">
+              {renderPreferenceSummary(
+                "Traditional Zoning",
+                SUMMARY_TRADITIONAL,
+                PROGRAM_TRADITIONAL,
+                "#EF1300",
+              )}
+              {renderPreferenceSummary(
+                "Dynamic Zoning",
+                summaryFriendly,
+                programFriendly,
+                "#00FF55",
+              )}
+            </div>
+            <div className="question-controls">
+              <div className="slider-area">
+                <label className="slider-label" htmlFor="preference-slider">
+                  {preferenceValue.toFixed(1)}
+                </label>
+                <input
+                  id="preference-slider"
+                  type="range"
+                  min={PREFERENCE_MIN}
+                  max={PREFERENCE_MAX}
+                  step={PREFERENCE_STEP}
+                  value={preferenceValue}
+                  onChange={(event) =>
+                    setPreferenceValue(Number(event.target.value))
+                  }
+                  className="slider"
+                />
+                <div className="slider-scale">
+                  <span>Classic</span>
+                  <span>Dynamic</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="confirm-button"
+            onClick={handleConfirm}
+          >
+            <span className="sr-only">Confirm preference</span>
+          </button>
         </main>
       </div>
     );
@@ -451,20 +626,75 @@ const OverlayApp = (): ReactElement => {
   );
 };
 
-function renderResult(
-  title,
-  summary,
-  program,
-  color = "#ffffff",
-  submitError = false,
-  isSubmitting = false,
-) {
-  const likelihood = "Likelihood of Construction";
-  const mruLabel = program["MRU"];
-  program["Market Rate Housing Units"] = mruLabel;
-  const [market, ...rest] = program;
+function renderPreferenceSummary(
+  title: string,
+  summary: ResultSummary | null,
+  program: ProgramEntry[] | null,
+  highlightColor = "#ffffff",
+): ReactElement {
+  const likelihoodKey = "Likelihood of Construction";
+  const storiesValue = formatValueWithHint(summary?.["Stories"], "Stories");
+  const likelihoodValue = formatValueWithHint(
+    summary?.[likelihoodKey],
+    likelihoodKey,
+  );
+  const normalizedProgram = Array.isArray(program) ? program : [];
+  const amenityPrograms = normalizedProgram.filter(
+    (entry) => entry?.name != null,
+  );
 
-  console.log(program);
+  return (
+    <section className="preference-summary-card">
+      <h3 className="preference-summary-title">{title}</h3>
+      <dl className="preference-summary-metrics">
+        <div className="preference-summary-row">
+          <dt>Stories</dt>
+          <dd style={{ color: highlightColor }}>{storiesValue}</dd>
+        </div>
+        <div className="preference-summary-row">
+          <dt>{likelihoodKey}</dt>
+          <dd style={{ color: highlightColor }}>{likelihoodValue}</dd>
+        </div>
+      </dl>
+      {amenityPrograms.length > 0 && (
+        <ul className="preference-program-list">
+          {amenityPrograms.map((entry, index) => (
+            <li key={`${entry?.name ?? `program-${index}`}`}>
+              <span>{entry?.name ?? "Program"}</span>
+              <span>{formatValue(entry?.Number)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function renderResult(
+  title: string,
+  summary: ResultSummary | null,
+  program: ProgramEntry[] | null,
+  color = "#ffffff",
+  submitError: string | null = null,
+  isSubmitting = false,
+): ReactElement {
+  const likelihood = "Likelihood of Construction";
+  const normalizedProgram = Array.isArray(program) ? program : [];
+  const renamedProgram = normalizedProgram.map((entry) =>
+    entry?.name === "MRU" ? { ...entry, name: "Market Rate Units" } : entry,
+  );
+  const marketIndex = renamedProgram.findIndex(
+    (entry) => entry?.name === "Market Rate Units",
+  );
+  const market =
+    marketIndex >= 0 ? renamedProgram[marketIndex] ?? null : null;
+  const rest =
+    marketIndex >= 0
+      ? renamedProgram.filter((_, index) => index !== marketIndex)
+      : renamedProgram;
+  const showSummary = summary != null && !submitError && !isSubmitting;
+  const showProgram =
+    (market != null || rest.length > 0) && !submitError && !isSubmitting;
 
   return (
     <section className="results-section">
@@ -474,40 +704,45 @@ function renderResult(
         <p className="api-status error">{submitError}</p>
       )}
 
-      {summary && !isSubmitting && !submitError && (
+      {showSummary && (
         <dl className="summary-grid">
           <div className="summary-row">
             <dt>Stories</dt>
-            <dd style={{ color: color }}>
-              {formatValueWithHint(summary["Stories"], "Stories")}
+            <dd style={{ color }}>
+              {formatValueWithHint(summary?.["Stories"], "Stories")}
             </dd>
             <dt>{likelihood}</dt>
-            <dd style={{ color: color }}>
-              {formatValueWithHint(summary[likelihood], likelihood)}
+            <dd style={{ color }}>
+              {formatValueWithHint(summary?.[likelihood], likelihood)}
             </dd>
           </div>
         </dl>
       )}
 
-      {program.length > 0 && !isSubmitting && !submitError && (
+      {showProgram && (
         <div className="program-table">
           <div className="program-row program-header">
             <span>Program</span>
             <span>Number</span>
           </div>
 
-          <div
-            className="program-row"
-            key={"market"}
-            style={{ color: color, marginBottom: "10px" }}
-          >
-            <span>Market Rate Units</span>
-            <span>{formatValue(market.Number)}</span>
-          </div>
+          {market != null && (
+            <div
+              className="program-row"
+              key="market"
+              style={{ color, marginBottom: "10px" }}
+            >
+              <span>{market.name ?? "Market Rate Units"}</span>
+              <span>{formatValue(market.Number)}</span>
+            </div>
+          )}
 
-          {rest.map((entry) => (
-            <div className="program-row" key={entry.name}>
-              <span>{entry.name}</span>
+          {rest.map((entry, index) => (
+            <div
+              className="program-row"
+              key={`${entry.name ?? `program-${index}`}`}
+            >
+              <span>{entry.name ?? "Program"}</span>
               <span>{formatValue(entry.Number)}</span>
             </div>
           ))}
@@ -518,48 +753,66 @@ function renderResult(
 }
 
 function formatDollar(
-  amount,
-  locales = "en-US",
+  amount: unknown,
+  locales: Intl.LocalesArgument = "en-US",
   currencySymbol = "$",
   spaceAfterSymbol = true,
-) {
-  // Convert numeric-string inputs to number
-  const num =
-    typeof amount === "string"
-      ? Number(amount.replace(/[^0-9.-]/g, ""))
-      : Number(amount);
-  if (!isFinite(num)) return amount + ""; // return original if not a valid number
+): string {
+  let numericValue: number | null = null;
+  if (typeof amount === "number") {
+    numericValue = amount;
+  } else if (typeof amount === "string") {
+    const parsed = Number(amount.replace(/[^0-9.-]/g, ""));
+    if (Number.isFinite(parsed)) {
+      numericValue = parsed;
+    }
+  }
+
+  if (numericValue == null || !Number.isFinite(numericValue)) {
+    return amount == null ? "—" : String(amount);
+  }
 
   const formatted = new Intl.NumberFormat(locales, {
-    maximumFractionDigits: 0, // no cents; change to 2 if you want cents shown
-    roundingMode: "halfExpand", // for modern browsers; increases clarity of intent
-  }).format(Math.round(num)); // round to integer
+    maximumFractionDigits: 0,
+  }).format(Math.round(numericValue));
 
-  return currencySymbol + (spaceAfterSymbol ? " " : "") + formatted;
+  return `${currencySymbol}${spaceAfterSymbol ? " " : ""}${formatted}`;
 }
 
 const formatValueWithHint = (value: unknown, hint: string): string => {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
+  const fallback = value == null ? "—" : String(value);
+
   switch (hint) {
     case "NPV":
     case "dollars":
       return formatDollar(value);
-    case "MRU Stories": // just the MRU Story??
+    case "MRU Stories":
     case "stories":
     case "Stories":
-    case "story":
-      const storyNum = Math.ceil(value);
-      if (storyNum < 2) {
-        return "one story";
-      } else {
-        return storyNum + "";
+    case "story": {
+      if (Number.isFinite(numericValue)) {
+        const storyNum = Math.ceil(numericValue);
+        return storyNum < 2 ? "one story" : storyNum.toString();
       }
+      return fallback;
+    }
     case "IRR":
     case "Likelihood of Construction":
-    case "percentage":
-      const percentage = Math.floor(value * 100.0);
-      return percentage + " %";
+    case "percentage": {
+      if (Number.isFinite(numericValue)) {
+        const percentage = Math.floor(numericValue * 100.0);
+        return `${percentage} %`;
+      }
+      return fallback;
+    }
     default:
-      return value + "";
+      return fallback;
   }
 };
 
@@ -572,6 +825,14 @@ const formatValue = (value: unknown): string => {
     return Number.isInteger(value)
       ? value.toString()
       : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
   }
 
   return String(value);

@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui
+    ports:
+      - "5173:4173"
+    depends_on:
+      replacement-server:
+        condition: service_started
+
+  replacement-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    environment:
+      REPLACEMENT_MODEL_PORT: "43110"
+      DATABASE_URL: "postgresql://ui_app:ui_app@db:5432/frankeinstein"
+    ports:
+      - "43110:43110"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: frankeinstein
+      POSTGRES_USER: ui_app
+      POSTGRES_PASSWORD: ui_app
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ui_app -d frankeinstein"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
