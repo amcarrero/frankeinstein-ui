@@ -1,4 +1,4 @@
-import { Suspense, type FC } from 'react'
+import { type FC } from 'react'
 
 import ThreeDVizApp from './3dviz/App'
 import OverlayExperience from './overlay/App'
