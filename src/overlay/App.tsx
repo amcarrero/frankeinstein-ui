@@ -539,7 +539,7 @@ const OverlayApp = (): ReactElement => {
                 "#00FF55",
               )}
             </div>
-            <div className="question-controls">
+            <div className="question-controls" style={{height: 0}}>
               <div className="slider-area">
                 <label className="slider-label" htmlFor="preference-slider">
                   {preferenceValue.toFixed(1)}
