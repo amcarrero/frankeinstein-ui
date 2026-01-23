@@ -4,7 +4,7 @@ import "./App.css";
 import { useHardwareBridge } from "./hooks/useHardwareBridge";
 
 const API_ENDPOINT = "http://tars.media.mit.edu:50053/proforma";
-const HARDWARE_SOCKET_URL = "ws://10.134.5.198:8080/";
+const HARDWARE_SOCKET_URL = "ws://mechtable.media.mit.edu:8080/";
 const HARDWARE_SLIDER_MAX = 1;
 const REPLACEMENT_MODEL_ENDPOINT = "http://localhost:43110/replacement-model";
 const RESULTS_MODEL_OPTIONS = [
